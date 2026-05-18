@@ -23,6 +23,15 @@ async function run() {
   try {
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
+    const db = client.db("mediqueueDB");
+    const tutorsCollection = db.collection("tutors");
+
+    app.post('/tutors', async (req, res) => {
+      const newTutor = req.body;
+      const result = await tutorsCollection.insertOne(newTutor);
+      res.send(result);
+    });
+
   } finally {
   }
 }
