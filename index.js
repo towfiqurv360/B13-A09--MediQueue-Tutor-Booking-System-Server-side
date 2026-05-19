@@ -23,7 +23,10 @@ async function run() {
   try {
     const db = client.db("mediqueueDB");
     const tutorsCollection = db.collection("tutors");
+    
+    const bookedSessionsCollection = db.collection("bookedSessions");
 
+   
     app.post('/tutors', async (req, res) => {
       const newTutor = req.body;
       const result = await tutorsCollection.insertOne(newTutor);
@@ -35,6 +38,7 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
+    
     app.get('/tutors/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -42,9 +46,15 @@ async function run() {
       res.send(result);
     });
 
+   
+    app.post('/book-session', async (req, res) => {
+      const sessionData = req.body;
+      const result = await bookedSessionsCollection.insertOne(sessionData);
+      res.send(result);
+    });
+
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
-    
   }
 }
 run().catch(console.dir);
