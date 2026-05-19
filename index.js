@@ -49,6 +49,17 @@ async function run() {
    
     app.post('/book-session', async (req, res) => {
       const sessionData = req.body;
+      
+      const query = { 
+        tutorId: sessionData.tutorId, 
+        userEmail: sessionData.userEmail 
+      };
+      const alreadyBooked = await bookedSessionsCollection.findOne(query);
+
+      if (alreadyBooked) {
+        return res.send({ insertedId: null, message: "Already booked" });
+      }
+
       const result = await bookedSessionsCollection.insertOne(sessionData);
       res.send(result);
     });
