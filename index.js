@@ -23,7 +23,6 @@ async function run() {
   try {
     const db = client.db("mediqueueDB");
     const tutorsCollection = db.collection("tutors");
-    
     const bookedSessionsCollection = db.collection("bookedSessions");
 
    
@@ -46,21 +45,58 @@ async function run() {
       res.send(result);
     });
 
+    app.get('/my-tutors', async (req, res) => {
+      const email = req.query.email;
+      const query = { userEmail: email };
+      const result = await tutorsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.patch('/tutors/:id', async (req, res) => {
+      const id = req.params.id;
+      const updatedData = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          price: updatedData.price,
+          phone: updatedData.phone,
+          description: updatedData.description,
+        },
+      };
+      const result = await tutorsCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    app.delete('/tutors/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await tutorsCollection.deleteOne(query);
+      res.send(result);
+    });
+
    
-    app.post('/book-session', async (req, res) => {
+    app.post('/booked-sessions', async (req, res) => {
       const sessionData = req.body;
       
       const query = { 
         tutorId: sessionData.tutorId, 
         userEmail: sessionData.userEmail 
       };
+      
       const alreadyBooked = await bookedSessionsCollection.findOne(query);
 
       if (alreadyBooked) {
-        return res.send({ insertedId: null, message: "Already booked" });
+        return res.send({ insertedId: null, message: "Already booked! You have already registered for this session." });
       }
 
       const result = await bookedSessionsCollection.insertOne(sessionData);
+      res.send(result);
+    });
+
+    app.get('/booked-sessions', async (req, res) => {
+      const email = req.query.email;
+      const query = { userEmail: email };
+      const result = await bookedSessionsCollection.find(query).toArray();
       res.send(result);
     });
 
