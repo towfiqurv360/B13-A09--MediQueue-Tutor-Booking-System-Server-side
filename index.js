@@ -138,6 +138,12 @@ async function run() {
       if (req.decoded.email !== email) {
           return res.status(403).send({ error: true, message: 'forbidden access' });
       }
+      app.delete('/booked-sessions/:id', verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await bookedSessionsCollection.deleteOne(query);
+      res.send(result);
+    });
       const query = { userEmail: email };
       const result = await bookedSessionsCollection.find(query).toArray();
       res.send(result);
