@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
@@ -19,40 +20,81 @@ const client = new MongoClient(uri, {
   }
 });
 
+const verifyToken = (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        return res.status(401).send({ error: true, message: 'unauthorized access' });
+    }
+    const token = authorization.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ error: true, message: 'unauthorized access' });
+        }
+        req.decoded = decoded;
+        next();
+    });
+};
+
 async function run() {
   try {
     const db = client.db("mediqueueDB");
     const tutorsCollection = db.collection("tutors");
     const bookedSessionsCollection = db.collection("bookedSessions");
 
-   
-    app.post('/tutors', async (req, res) => {
+    app.post('/jwt', (req, res) => {
+        const user = req.body;
+        const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '5h' });
+        res.send({ token });
+    });
+
+    app.post('/tutors', verifyToken, async (req, res) => {
       const newTutor = req.body;
+      newTutor.createdAt = new Date().toISOString();
       const result = await tutorsCollection.insertOne(newTutor);
       res.send(result);
     });
 
     app.get('/tutors', async (req, res) => {
-      const cursor = tutorsCollection.find();
+      const { search, startDate, endDate } = req.query;
+      let query = {};
+
+      if (search) {
+        query.name = { $regex: search, $options: 'i' };
+      }
+
+      if (startDate || endDate) {
+        query.createdAt = {};
+        if (startDate) {
+            query.createdAt.$gte = new Date(startDate).toISOString();
+        }
+        if (endDate) {
+            query.createdAt.$lte = new Date(endDate).toISOString();
+        }
+      }
+
+      const cursor = tutorsCollection.find(query);
       const result = await cursor.toArray();
       res.send(result);
     });
     
-    app.get('/tutors/:id', async (req, res) => {
+    app.get('/tutors/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await tutorsCollection.findOne(query);
       res.send(result);
     });
 
-    app.get('/my-tutors', async (req, res) => {
+    app.get('/my-tutors', verifyToken, async (req, res) => {
       const email = req.query.email;
+      if (req.decoded.email !== email) {
+          return res.status(403).send({ error: true, message: 'forbidden access' });
+      }
       const query = { userEmail: email };
       const result = await tutorsCollection.find(query).toArray();
       res.send(result);
     });
 
-    app.patch('/tutors/:id', async (req, res) => {
+    app.patch('/tutors/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
       const updatedData = req.body;
       const filter = { _id: new ObjectId(id) };
@@ -61,30 +103,28 @@ async function run() {
           price: updatedData.price,
           phone: updatedData.phone,
           description: updatedData.description,
+          image: updatedData.image,
         },
       };
       const result = await tutorsCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
 
-    app.delete('/tutors/:id', async (req, res) => {
+    app.delete('/tutors/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await tutorsCollection.deleteOne(query);
       res.send(result);
     });
 
-   
-    app.post('/booked-sessions', async (req, res) => {
+    app.post('/booked-sessions', verifyToken, async (req, res) => {
       const sessionData = req.body;
-      
       const query = { 
         tutorId: sessionData.tutorId, 
         userEmail: sessionData.userEmail 
       };
-      
       const alreadyBooked = await bookedSessionsCollection.findOne(query);
-
+      
       if (alreadyBooked) {
         return res.send({ insertedId: null, message: "Already booked! You have already registered for this session." });
       }
@@ -93,14 +133,16 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/booked-sessions', async (req, res) => {
+    app.get('/booked-sessions', verifyToken, async (req, res) => {
       const email = req.query.email;
+      if (req.decoded.email !== email) {
+          return res.status(403).send({ error: true, message: 'forbidden access' });
+      }
       const query = { userEmail: email };
       const result = await bookedSessionsCollection.find(query).toArray();
       res.send(result);
     });
 
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
   }
 }
@@ -111,5 +153,4 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on port: ${port}`);
 });
